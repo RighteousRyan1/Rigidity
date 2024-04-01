@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Terraria;
+using Terraria.Audio;
 using Terraria.GameContent;
 using Terraria.ID;
 using Terraria.ModLoader;
@@ -37,10 +38,12 @@ public class PhysicsSystem : ModSystem {
             World.Gravity = new(0, f);
             orig("Changed gravity to " + f, R, G, B);
         }
+        orig(newText, R, G, B);
     }
 
     public static phys.Vector2 GetCorner(Vector2 hypStart, Vector2 hypEnd) => new(hypEnd.X - (hypEnd.X - hypStart.X), hypStart.Y + (hypEnd.Y - hypStart.Y));
     public override void PostUpdateEverything() {
+        _timeSinceLastCollision++;
         World.Step(1);
         World.Gravity = new(0, 0.1f);
 
@@ -53,8 +56,8 @@ public class PhysicsSystem : ModSystem {
             }
             TestId = Main.LocalPlayer.HeldItem.type; //Main.rand.Next(ItemLoader.ItemCount);
             TestTexture = TextureAssets.Item[TestId].Value; //TextureAssets.Item[id].Value;
-            var pos = Main.LocalPlayer.Top + (new Vector2(25, 0) * Main.LocalPlayer.direction);
-            var vel = new phys.Vector2(Main.rand.NextFloat(2, 3) * Main.LocalPlayer.direction, Main.rand.NextFloat(-2, -4));
+            var pos = Main.LocalPlayer.Top + (new Vector2(25, 0) * Main.LocalPlayer.direction) - (Main.itemAnimations[TestId] != null ? new Vector2(TestTexture.Width / 2, TestTexture.Height / Main.itemAnimations[TestId].FrameCount) : TestTexture.Size());
+            var vel = new phys.Vector2(Main.rand.NextFloat(2, 3) * Main.LocalPlayer.direction, Main.rand.NextFloat(-2, -4)) + Main.LocalPlayer.velocity.ToPhysV2();
             var vertices = ItemConvexSystem.Vector2ArrayToVertices(ItemConvexSystem.ItemIDToConvexHull[TestId]);
             // call it before so i can step over and see the actual texture center
             CenterOfCurrentHull = ItemConvexSystem.Center(ItemConvexSystem.VerticesToVector2Array(vertices));
@@ -63,18 +66,19 @@ public class PhysicsSystem : ModSystem {
             }
             CenterOfCurrentHull /= UNITS_PER_METER;
 
-            _cb = World.CreatePolygon(vertices, 1f, Main.MouseWorld.ToPhysV2() / UNITS_PER_METER, bodyType: BodyType.Dynamic);
-            // _cb = World.CreateRectangle(TestTexture.Width / UNITS_PER_METER, TestTexture.Height / UNITS_PER_METER, 1f, pos.ToPhysV2() / UNITS_PER_METER, 0f, BodyType.Dynamic);
-            //_cb.LinearVelocity = vel;
+            _cb = World.CreatePolygon(vertices, 1f, pos.ToPhysV2() / UNITS_PER_METER, bodyType: BodyType.Dynamic);
+            _cb.LinearVelocity = vel;
             _cb.AngularDamping = 0f;
             _cb.OnCollision += SetProperties;
             _cb.OnSeparation += ResetProperties;
             _cb.SleepingAllowed = false;
             _cb.Tag = PhysicsTags.DynamicPhysicsBody;
+            _cb.AngularVelocity = vel.Length() / 12;
+            //_cb.Rotation = MathHelper.PiOver2;
 
         }
         if (_cb != null) {
-            if (Collision.DrownCollision(_cb.Position.ToXnaV2() * UNITS_PER_METER, 16, 16)) {
+            if (ItemConvexSystem.ItemIDToConvexHull[TestId].Any(x => Collision.DrownCollision((_cb.Position.ToXnaV2() * UNITS_PER_METER + x / UNITS_PER_METER), 16, 16))) {
                 _cb.LinearDamping = 0.175f;
                 _cb.AngularDamping = 0.175f;
             } else {
@@ -88,39 +92,83 @@ public class PhysicsSystem : ModSystem {
         //sender.Restitution = 0f;
         //sender.Friction = DefaultFriction;
     }
-
+    private static uint _timeSinceLastCollision;
     private bool SetProperties(Fixture sender, Fixture other, nkast.Aether.Physics2D.Dynamics.Contacts.Contact contact) {
         var rounded = new Point(((int)(other.Body.Position.X * UNITS_PER_METER)) / 16, ((int)(other.Body.Position.Y * UNITS_PER_METER)) / 16);
         var tile = Framing.GetTileSafely(rounded);
         var tileType = tile.TileType;
+        var absVel = MathHelper.Lerp(0f, 2f, new Vector2(MathF.Abs(sender.Body.LinearVelocity.X), MathF.Abs(sender.Body.LinearVelocity.Y)).Length());
+        //var contactPositionInWorld = (sender.Body.Position.ToXnaV2() + contact.Manifold.LocalPoint.ToXnaV2().RotatedBy(sender.Body.Rotation)) * UNITS_PER_METER;
+        /*var contactPointsInWorld = new List<Vector2>() {
+            contact.Manifold.Points[0].LocalPoint.ToXnaV2(),
+            contact.Manifold.Points[1].LocalPoint.ToXnaV2()
+        };*/
+        //Main.NewText(contact.Manifold.Points[0].LocalPoint + " " + contact.Manifold.Points[1].LocalPoint);
+        //Main.NewText(absVel);
+        var offset = (CenterOfCurrentHull * 2 * new Vector2(32f / TestTexture.Width, 32f / TestTexture.Height)) + Vector2.One;
+        var volScale = 0.08f;
+
+        int timeBeforeSounds = 10;
+        if (StoneBlocks.Contains(tileType)) {
+            if (_timeSinceLastCollision > timeBeforeSounds) {
+                SoundEngine.PlaySound(SoundID.Tink.WithVolumeScale(absVel * volScale), sender.Body.Position.ToXnaV2() * UNITS_PER_METER);
+                _timeSinceLastCollision = 0;
+            }
+            // dust spawning works fine when there's no rotation involved, otherwise no.
+            /*contactPointsInWorld.ForEach(x => {
+                var d = Dust.NewDustPerfect((sender.Body.Position.ToXnaV2() + x) * UNITS_PER_METER + offset, DustID.Stone, Vector2.Zero);
+                d.noGravity = true;
+                });*/
+        }
         if (IceBlocks.Contains(tileType)) {
-            contact.Friction = 0.01f;
+            // SoundEngine.PlaySound(SoundID.SomeIceSound.WithVolumeScale(absVel * volScale), sender.Body.Position.ToXnaV2() * UNITS_PER_METER);
+            contact.Friction = 0.02f;
         } else if (StickyBlocks.Contains(tileType)) {
+            if (_timeSinceLastCollision > timeBeforeSounds) {
+                SoundEngine.PlaySound(SoundID.NPCDeath1.WithVolumeScale(absVel * volScale), sender.Body.Position.ToXnaV2() * UNITS_PER_METER);
+                _timeSinceLastCollision = 0;
+            }
+
             contact.Friction = 0.98f;
         } else if (tileType == TileID.SillyBalloonGreen || tileType == TileID.SillyBalloonPink || tileType == TileID.SillyBalloonPurple) {
-            contact.Restitution = 0.85f;
+            contact.Restitution = 0.925f;
         }
-        //}
+        else {
+            if (!AllTileLists.Any(x => x.Contains(tileType))) {
+                if (_timeSinceLastCollision > timeBeforeSounds) {
+                    SoundEngine.PlaySound(SoundID.Dig.WithVolumeScale(absVel * volScale), sender.Body.Position.ToXnaV2() * UNITS_PER_METER);
+                    _timeSinceLastCollision = 0;
+                }
+            }
+        }
+        if (other.Body.Tag.Equals(PhysicsTags.PlayerBody)) {
+            if (_timeSinceLastCollision > timeBeforeSounds) {
+                SoundEngine.PlaySound(SoundID.PlayerHit.WithVolumeScale(absVel * volScale * 2), Main.LocalPlayer.Center);
+                _timeSinceLastCollision = 0;
+            }
+        }
         return true;
     }
 
     public override void PostDrawTiles() {
-        Main.spriteBatch.Begin(default, default, default, default, default, default, Main.GameViewMatrix.TransformationMatrix);
+        Main.spriteBatch.Begin(default, default, SamplerState.PointClamp, default, default, default, Main.GameViewMatrix.TransformationMatrix);
         var wp = Mod.Assets.Request<Texture2D>("Assets/white_pixel", ReLogic.Content.AssetRequestMode.ImmediateLoad);
         foreach (var b in World.BodyList) {
-            var tagArray = (PhysicsTags)b.Tag;
-            var tags = tagArray.GetTags();
-            if (tags.Contains(PhysicsTags.TileBodyTriangular))
+            var tags = (PhysicsTags)b.Tag;
+            var tagArray = tags.GetTags();
+            if (PhysicsTags.IsTriangle(tags))
                 continue;
             // nah but why does this return false for something with the DynamicPhysicsBody tag?
-            if (tags.Contains(PhysicsTags.DYN_PHYS_BODY_STR)) {
+            if (tagArray.Contains(PhysicsTags.DYN_PHYS_BODY_STR)) {
                 var color = Lighting.GetSubLight(b.Position.ToXnaV2() * UNITS_PER_METER);
+                var offset = (CenterOfCurrentHull * 2 * new Vector2(32f / TestTexture.Width, 32f / TestTexture.Height)) + Vector2.One;
+                //var reallyWeirdOffset = (CenterOfCurrentHull * 2 * (32f / TestTexture.Height));
                 Main.spriteBatch.Draw(TestTexture, 
-                    b.Position.ToXnaV2() * UNITS_PER_METER - Main.screenPosition,
+                    b.Position.ToXnaV2() * UNITS_PER_METER - Main.screenPosition + offset,
                     Main.itemAnimations[TestId] != null ? new Rectangle(0, TestTexture.Height / Main.itemAnimations[TestId].FrameCount * Main.itemAnimations[TestId].Frame, TestTexture.Width, TestTexture.Height / Main.itemAnimations[TestId].FrameCount) : null, new Color(color), b.Rotation,
                     Vector2.Zero, Vector2.One, default, default);
             }
-            else if (tags.Contains(PhysicsTags.PLR_BDY_STR)) { 
+            else if (tagArray.Contains(PhysicsTags.PLR_BDY_STR)) { 
                 Main.spriteBatch.Draw(wp.Value, b.Position.ToXnaV2() * UNITS_PER_METER - Main.screenPosition, null, Color.Blue * 0.25f,
                     b.Rotation,
                     Vector2.Zero,
