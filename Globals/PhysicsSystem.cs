@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using nkast.Aether.Physics2D.Dynamics;
+using Rigidity.Debug;
 using Rigidity.Physics;
 using System;
 using System.Collections.Generic;
@@ -23,6 +24,7 @@ public class PhysicsSystem : ModSystem {
     private Body _cb;
     public static float DefaultFriction = 0.5f;
 
+    //public static Mesh2D CurPhysMesh;
     public static Texture2D TestTexture;
     public static Vector2 CenterOfCurrentHull;
     public override void Load() {
@@ -48,7 +50,7 @@ public class PhysicsSystem : ModSystem {
                     _cb = null;
                 }
             }
-            var id = ItemID.IronPickaxe; //Main.rand.Next(ItemLoader.ItemCount);
+            var id = Main.rand.Next(ItemLoader.ItemCount);
             TestTexture = TextureAssets.Item[id].Value; //TextureAssets.Item[id].Value;
             var pos = Main.LocalPlayer.Top + (new Vector2(25, 0) * Main.LocalPlayer.direction);
             var vel = new phys.Vector2(Main.rand.NextFloat(2, 3) * Main.LocalPlayer.direction, Main.rand.NextFloat(-2, -4));
@@ -91,8 +93,7 @@ public class PhysicsSystem : ModSystem {
         } else if (StickyBlocks.Contains(tileType)) {
             contact.Friction = 0.98f;
         } else if (tileType == TileID.SillyBalloonGreen || tileType == TileID.SillyBalloonPink || tileType == TileID.SillyBalloonPurple) {
-            contact.Friction = 0.99f;
-            contact.Restitution = 0.99f;
+            contact.Restitution = 0.8f;
         }
         //}
         return true;

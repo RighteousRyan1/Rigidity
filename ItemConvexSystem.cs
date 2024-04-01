@@ -80,9 +80,8 @@ public class ItemConvexSystem : ModSystem
 
     public static Vector2 Center(params Vector2[] vertices) {
         Vector2 total = new();
-        for (int i = 0; i < vertices.Length; i++) {
-            total += new Vector2(vertices[i].X, vertices[i].Y);
-        }
+        for (int i = 0; i < vertices.Length; i++)
+            total += vertices[i];
         total /= vertices.Length;
         return total;
     }
