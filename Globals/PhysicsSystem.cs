@@ -25,6 +25,7 @@ public class PhysicsSystem : ModSystem {
     public static float DefaultFriction = 0.5f;
 
     //public static Mesh2D CurPhysMesh;
+    public static int TestId;
     public static Texture2D TestTexture;
     public static Vector2 CenterOfCurrentHull;
     public override void Load() {
@@ -50,15 +51,15 @@ public class PhysicsSystem : ModSystem {
                     _cb = null;
                 }
             }
-            var id = Main.rand.Next(ItemLoader.ItemCount);
-            TestTexture = TextureAssets.Item[id].Value; //TextureAssets.Item[id].Value;
+            TestId = Main.LocalPlayer.HeldItem.type; //Main.rand.Next(ItemLoader.ItemCount);
+            TestTexture = TextureAssets.Item[TestId].Value; //TextureAssets.Item[id].Value;
             var pos = Main.LocalPlayer.Top + (new Vector2(25, 0) * Main.LocalPlayer.direction);
             var vel = new phys.Vector2(Main.rand.NextFloat(2, 3) * Main.LocalPlayer.direction, Main.rand.NextFloat(-2, -4));
-            var vertices = ItemConvexSystem.Vector2ArrayToVertices(ItemConvexSystem.ItemIDToConvexHull[id]);
+            var vertices = ItemConvexSystem.Vector2ArrayToVertices(ItemConvexSystem.ItemIDToConvexHull[TestId]);
             // call it before so i can step over and see the actual texture center
             CenterOfCurrentHull = ItemConvexSystem.Center(ItemConvexSystem.VerticesToVector2Array(vertices));
             for (int i = 0; i < vertices.Count; i++) {
-                vertices[i] /= UNITS_PER_METER;
+                vertices[i] /= UNITS_PER_METER * 1f;
             }
             CenterOfCurrentHull /= UNITS_PER_METER;
 
@@ -74,7 +75,11 @@ public class PhysicsSystem : ModSystem {
         }
         if (_cb != null) {
             if (Collision.DrownCollision(_cb.Position.ToXnaV2() * UNITS_PER_METER, 16, 16)) {
-                _cb.LinearDamping = 0.25f;
+                _cb.LinearDamping = 0.175f;
+                _cb.AngularDamping = 0.175f;
+            } else {
+                _cb.LinearDamping = 0;
+                _cb.AngularDamping = 0;
             }
         }
     }
@@ -93,7 +98,7 @@ public class PhysicsSystem : ModSystem {
         } else if (StickyBlocks.Contains(tileType)) {
             contact.Friction = 0.98f;
         } else if (tileType == TileID.SillyBalloonGreen || tileType == TileID.SillyBalloonPink || tileType == TileID.SillyBalloonPurple) {
-            contact.Restitution = 0.8f;
+            contact.Restitution = 0.85f;
         }
         //}
         return true;
@@ -111,9 +116,9 @@ public class PhysicsSystem : ModSystem {
             if (tags.Contains(PhysicsTags.DYN_PHYS_BODY_STR)) {
                 var color = Lighting.GetSubLight(b.Position.ToXnaV2() * UNITS_PER_METER);
                 Main.spriteBatch.Draw(TestTexture, 
-                    b.Position.ToXnaV2() * UNITS_PER_METER - Main.screenPosition, 
-                    null, new Color(color), b.Rotation,
-                    Vector2.Zero/* + -CenterOfCurrentHull * UNITS_PER_METER*/, Vector2.One, default, default);
+                    b.Position.ToXnaV2() * UNITS_PER_METER - Main.screenPosition,
+                    Main.itemAnimations[TestId] != null ? new Rectangle(0, TestTexture.Height / Main.itemAnimations[TestId].FrameCount * Main.itemAnimations[TestId].Frame, TestTexture.Width, TestTexture.Height / Main.itemAnimations[TestId].FrameCount) : null, new Color(color), b.Rotation,
+                    Vector2.Zero, Vector2.One, default, default);
             }
             else if (tags.Contains(PhysicsTags.PLR_BDY_STR)) { 
                 Main.spriteBatch.Draw(wp.Value, b.Position.ToXnaV2() * UNITS_PER_METER - Main.screenPosition, null, Color.Blue * 0.25f,
@@ -122,11 +127,10 @@ public class PhysicsSystem : ModSystem {
                     Vector2.One * Main.LocalPlayer.Size, default, default);
             }
             /*else {
-                Main.spriteBatch.Draw(wp.Value, Vector2.Transform(b.Position.ToXnaV2() * UNITS_PER_METER - Main.screenPosition,
-                    Main.GameViewMatrix.TransformationMatrix), null, Color.Orange * 0.25f,
+                Main.spriteBatch.Draw(wp.Value, b.Position.ToXnaV2() * UNITS_PER_METER - Main.screenPosition, null, Color.Orange * 0.25f,
                     b.Rotation,
                     Vector2.Zero,
-                    Vector2.One * 16 * Main.GameZoomTarget, default, default);
+                    Vector2.One * 16, default, default);
             }*/
         }
         //Main.spriteBatch.Draw(wp.Value, new Rectangle(TileBodyHandler.PlayerCheckAround.X - (int)Main.screenPosition.X, TileBodyHandler.PlayerCheckAround.Y - (int)Main.screenPosition.Y, TileBodyHandler.PlayerCheckAround.Width, TileBodyHandler.PlayerCheckAround.Height), Color.White * 0.2f);
