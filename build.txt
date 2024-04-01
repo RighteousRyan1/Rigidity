@@ -1,0 +1,4 @@
+displayName = Rigidity
+author = RighteousRyan
+version = 0.1
+dllReferences = Aether.Physics2D
