@@ -175,26 +175,27 @@ public class TileBodyHandler : ModSystem {
                 // hypoteneuse end
                 hypEnd,
                 // right triangle corner
-                new(hypEnd.X - (hypEnd.X - hypStart.X), hypStart.Y + (hypEnd.Y - hypStart.Y))
+                PhysicsSystem.GetCorner(hypStart, hypEnd), hypEnd - new Vector2(100, 0)
         });
-        var body = PhysicsSystem.World.CreatePolygon(vertices, 1f, hypStart);
+        // i'm convinced this polyogn is just creating problems.
+        var body = PhysicsSystem.World.CreatePolygon(vertices, 1f, pos);
         body.Tag = PhysicsTags.Triangle(hypStart, hypEnd);
         return body;
     }
     public static Body GenSlopeDR(Vector2 pos) {
         var hypStart = pos + new Vector2(0, PhysicsSystem.PIXELS_PER_TILE / PhysicsSystem.UNITS_PER_METER);
         // 16 because that's how many units a tile is wide/tall
-        var hypEnd = (pos + new Vector2(PhysicsSystem.PIXELS_PER_TILE / PhysicsSystem.UNITS_PER_METER, 0));
+        var hypEnd = pos + new Vector2(PhysicsSystem.PIXELS_PER_TILE / PhysicsSystem.UNITS_PER_METER, 0);
         var vertices = new Vertices(new List<Vector2>() {
                 // hypoteneuse start
                 hypStart,
                 // hypoteneuse end
                 hypEnd,
                 // right triangle corner
-                new(hypEnd.X - (hypEnd.X - hypStart.X), hypStart.Y + (hypEnd.Y - hypStart.Y))
+                PhysicsSystem.GetCorner(hypStart, hypEnd)
         });
-        var body = PhysicsSystem.World.CreatePolygon(vertices, 1f, hypStart);
-        body.Tag = PhysicsTags.Triangle(hypStart, hypEnd);
+        var body = PhysicsSystem.World.CreatePolygon(vertices, 1f, pos);
+        body.Tag = PhysicsTags.Triangle(hypEnd, hypStart); // reversed because GetCorner is goofy
         return body;
     }
 }
@@ -203,13 +204,3 @@ public enum Translation {
     TileToPhysics,
     PixelToPhysics
 }
-// old triangle making (with edges), DL
-//var body = PhysicsSystem.World.CreateEdge(
-//pos/*.ToPhysicsFromPixelCoordinates()*/,
-//(pos + new Vector2(16 / PhysicsSystem.UnitsPerMeter))/*.ToPhysicsFromPixelCoordinates()*/);
-// DR
-/*
- * var body = PhysicsSystem.World.CreateEdge(
-                                        (pos + new Vector2(0, 16 / PhysicsSystem.UnitsPerMeter)),
-                                        (pos + new Vector2(16 / PhysicsSystem.UnitsPerMeter, 0)));
-*/

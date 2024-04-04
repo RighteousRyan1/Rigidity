@@ -1,7 +1,9 @@
-﻿using nkast.Aether.Physics2D.Dynamics;
+﻿using Microsoft.Xna.Framework;
+using nkast.Aether.Physics2D.Dynamics;
 using Rigidity.Globals;
 using Rigidity.Physics;
 using Terraria;
+using Terraria.DataStructures;
 using Terraria.ModLoader;
 
 namespace Rigidity;
@@ -14,7 +16,7 @@ public class PlayerRigidBody : ModPlayer {
                 Player.width / PhysicsSystem.UNITS_PER_METER, 
                 Player.height / PhysicsSystem.UNITS_PER_METER, 2f, Player.position.ToPhysV2() / PhysicsSystem.UNITS_PER_METER);
             PlayerPhysics.BodyType = BodyType.Kinematic;
-            PlayerPhysics.Tag = PhysicsTags.PlayerBody;
+            PlayerPhysics.Tag = PhysicsTags.Player(Player);
             PlayerPhysics.FixedRotation = true;
         } else {
             PlayerPhysics.LinearVelocity = Player.velocity.ToPhysV2() / PhysicsSystem.UNITS_PER_METER;
